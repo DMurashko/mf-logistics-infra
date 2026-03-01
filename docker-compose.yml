@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  ingress:
+    image: nginx:alpine
+    container_name: logistics_ingress
+    ports:
+      - '80:80'
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - host-app
+      - login-app
+      - dashboard-app
+      - ui-library
+      - backend-api
+
+  host-app:
+    build:
+      context: ../mf-logistics-host-app
+    container_name: logistics_host_app
+    environment:
+      - VITE_UI_LIBRARY_URL=${VITE_UI_LIBRARY_URL}
+      - VITE_LOGIN_APP_URL=${VITE_LOGIN_APP_URL}
+      - VITE_DASHBOARD_APP_URL=${VITE_DASHBOARD_APP_URL}
+      - VITE_API_URL=${VITE_API_URL}
+
+  login-app:
+    build:
+      context: ../mf-logistics-login-app
+    container_name: logistics_login_app
+    environment:
+      - VITE_LOGIN_APP_URL=${VITE_LOGIN_APP_URL}
+      - VITE_API_URL=${VITE_API_URL}
+
+  dashboard-app:
+    build:
+      context: ../mf-logistics-dashboard-app
+    container_name: logistics_dashboard_app
+    environment:
+      - VITE_DASHBOARD_APP_URL=${VITE_DASHBOARD_APP_URL}
+      - VITE_API_URL=${VITE_API_URL}
+
+  ui-library:
+    build:
+      context: ../mf-logistics-ui-library
+    container_name: logistics_ui_library
+
+  backend-api:
+    build:
+      context: ../backend-api
+    container_name: logistics_backend_api
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - PORT=3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16
+    container_name: warehousedb
+    environment:
+      POSTGRES_USER: warehouseuser
+      POSTGRES_PASSWORD: warehousepass
+      POSTGRES_DB: warehousedb
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U warehouseuser -d warehousedb']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

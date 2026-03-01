@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  host-app:
+    build:
+      context: ../mf-logistics-host-app
+      target: builder
+    container_name: logistics_host_app_dev
+    command: pnpm run dev --host 0.0.0.0
+    ports:
+      - '3000:3000'
+    volumes:
+      - ../mf-logistics-host-app:/app
+      - /app/node_modules
+    environment:
+      - VITE_UI_LIBRARY_URL=${VITE_UI_LIBRARY_URL}
+      - VITE_LOGIN_APP_URL=${VITE_LOGIN_APP_URL}
+      - VITE_DASHBOARD_APP_URL=${VITE_DASHBOARD_APP_URL}
+      - VITE_API_URL=${VITE_API_URL}
+
+  login-app:
+    build:
+      context: ../mf-logistics-login-app
+      target: builder
+    container_name: logistics_login_app_dev
+    command: pnpm run dev --host 0.0.0.0
+    ports:
+      - '3001:3001'
+    volumes:
+      - ../mf-logistics-login-app:/app
+      - /app/node_modules
+    environment:
+      - VITE_LOGIN_APP_URL=${VITE_LOGIN_APP_URL}
+      - VITE_API_URL=${VITE_API_URL}
+
+  dashboard-app:
+    build:
+      context: ../mf-logistics-dashboard-app
+      target: builder
+    container_name: logistics_dashboard_app_dev
+    command: pnpm run dev --host 0.0.0.0
+    ports:
+      - '3004:3004'
+    volumes:
+      - ../mf-logistics-dashboard-app:/app
+      - /app/node_modules
+    environment:
+      - VITE_DASHBOARD_APP_URL=${VITE_DASHBOARD_APP_URL}
+      - VITE_API_URL=${VITE_API_URL}
+
+  ui-library:
+    build:
+      context: ../mf-logistics-ui-library
+      target: builder
+    container_name: logistics_ui_library_dev
+    command: pnpm run serve
+    ports:
+      - '3003:3003'
+      - '6006:6006'
+    volumes:
+      - ../mf-logistics-ui-library:/app
+      - /app/node_modules
+
+  backend-api:
+    build:
+      context: ../backend-api
+      target: builder
+    container_name: logistics_backend_api_dev
+    command: pnpm run start:dev
+    ports:
+      - '3005:3005'
+    volumes:
+      - ../backend-api:/app
+      - /app/node_modules
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - PORT=3005
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16
+    container_name: warehousedb_dev
+    environment:
+      POSTGRES_USER: warehouseuser
+      POSTGRES_PASSWORD: warehousepass
+      POSTGRES_DB: warehousedb
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U warehouseuser -d warehousedb']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata_dev:
