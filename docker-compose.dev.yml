@@ -2,79 +2,59 @@ version: '3.8'
 
 services:
   host-app:
+    image: logistics_host_app_dev_image
     build:
       context: ../mf-logistics-host-app
-      target: builder
     container_name: logistics_host_app_dev
-    command: pnpm run dev --host 0.0.0.0
     ports:
-      - '3000:3000'
-    volumes:
-      - ../mf-logistics-host-app:/app
-      - /app/node_modules
-    environment:
-      - VITE_UI_LIBRARY_URL=${VITE_UI_LIBRARY_URL}
-      - VITE_LOGIN_APP_URL=${VITE_LOGIN_APP_URL}
-      - VITE_DASHBOARD_APP_URL=${VITE_DASHBOARD_APP_URL}
-      - VITE_API_URL=${VITE_API_URL}
+      - '3000:80'
+    env_file:
+      - .env.local
 
   login-app:
+    image: logistics_login_app_dev_image
     build:
       context: ../mf-logistics-login-app
-      target: builder
     container_name: logistics_login_app_dev
-    command: pnpm run dev --host 0.0.0.0
     ports:
-      - '3001:3001'
-    volumes:
-      - ../mf-logistics-login-app:/app
-      - /app/node_modules
-    environment:
-      - VITE_LOGIN_APP_URL=${VITE_LOGIN_APP_URL}
-      - VITE_API_URL=${VITE_API_URL}
+      - '3001:80'
+    env_file:
+      - .env.local
 
   dashboard-app:
+    image: logistics_dashboard_app_dev_image
     build:
       context: ../mf-logistics-dashboard-app
-      target: builder
     container_name: logistics_dashboard_app_dev
-    command: pnpm run dev --host 0.0.0.0
     ports:
-      - '3004:3004'
-    volumes:
-      - ../mf-logistics-dashboard-app:/app
-      - /app/node_modules
-    environment:
-      - VITE_DASHBOARD_APP_URL=${VITE_DASHBOARD_APP_URL}
-      - VITE_API_URL=${VITE_API_URL}
+      - '3004:80'
+    env_file:
+      - .env.local
 
   ui-library:
+    image: logistics_ui_library_dev_image
     build:
       context: ../mf-logistics-ui-library
-      target: builder
     container_name: logistics_ui_library_dev
-    command: pnpm run serve
     ports:
-      - '3003:3003'
-      - '6006:6006'
-    volumes:
-      - ../mf-logistics-ui-library:/app
-      - /app/node_modules
+      - '3003:80'
+      - '6010:80'
 
   backend-api:
+    image: logistics_backend_api_dev_image
     build:
       context: ../backend-api
       target: builder
     container_name: logistics_backend_api_dev
-    command: pnpm run start:dev
+    command: sh -c "CI=true pnpm install && npx prisma generate && pnpm run start:dev"
     ports:
       - '3005:3005'
     volumes:
       - ../backend-api:/app
       - /app/node_modules
+    env_file:
+      - .env.local
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - JWT_SECRET=${JWT_SECRET}
       - PORT=3005
     depends_on:
       postgres:
