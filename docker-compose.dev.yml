@@ -1,6 +1,20 @@
 version: '3.8'
 
 services:
+  ingress:
+    image: nginx:alpine
+    container_name: logistics_ingress_dev
+    ports:
+      - '8081:80'
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - host-app
+      - login-app
+      - dashboard-app
+      - ui-library
+      - backend-api
+
   host-app:
     image: logistics_host_app_dev_image
     build:
@@ -46,16 +60,16 @@ services:
       context: ../backend-api
       target: builder
     container_name: logistics_backend_api_dev
-    command: sh -c "CI=true pnpm install && npx prisma generate && pnpm run start:dev"
+    command: sh -c "CI=true pnpm install && npx prisma generate && npx prisma migrate deploy && pnpm run start:dev"
     ports:
-      - '3005:3005'
+      - '3005:3000'
     volumes:
       - ../backend-api:/app
       - /app/node_modules
     env_file:
       - .env.local
     environment:
-      - PORT=3005
+      - PORT=3000
     depends_on:
       postgres:
         condition: service_healthy
