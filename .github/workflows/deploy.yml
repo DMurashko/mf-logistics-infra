@@ -43,7 +43,7 @@ jobs:
             export IMAGE_TAG="${IMAGE_TAG}"
 
             # ── Login to Scaleway Container Registry ──
-            echo "${SCW_SECRET_KEY}" | docker login "${SCW_REGISTRY}" -u nologin --password-stdin
+            docker login "${SCW_REGISTRY}" -u nologin -p "${SCW_SECRET_KEY}"
 
             # ── Pull latest images ──
             docker compose pull
