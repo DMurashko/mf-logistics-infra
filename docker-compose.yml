@@ -14,66 +14,69 @@ services:
       - dashboard-app
       - ui-library
       - backend-api
+    restart: unless-stopped
 
   host-app:
-    build:
-      context: ../mf-logistics-host-app
+    image: ${SCW_REGISTRY}/${SCW_NAMESPACE}/host-app:${IMAGE_TAG:-latest}
     container_name: logistics_host_app
     environment:
       - VITE_UI_LIBRARY_URL=${VITE_UI_LIBRARY_URL}
       - VITE_LOGIN_APP_URL=${VITE_LOGIN_APP_URL}
       - VITE_DASHBOARD_APP_URL=${VITE_DASHBOARD_APP_URL}
       - VITE_API_URL=${VITE_API_URL}
+    restart: unless-stopped
 
   login-app:
-    build:
-      context: ../mf-logistics-login-app
+    image: ${SCW_REGISTRY}/${SCW_NAMESPACE}/login-app:${IMAGE_TAG:-latest}
     container_name: logistics_login_app
     environment:
       - VITE_LOGIN_APP_URL=${VITE_LOGIN_APP_URL}
       - VITE_API_URL=${VITE_API_URL}
+    restart: unless-stopped
 
   dashboard-app:
-    build:
-      context: ../mf-logistics-dashboard-app
+    image: ${SCW_REGISTRY}/${SCW_NAMESPACE}/dashboard-app:${IMAGE_TAG:-latest}
     container_name: logistics_dashboard_app
     environment:
       - VITE_DASHBOARD_APP_URL=${VITE_DASHBOARD_APP_URL}
       - VITE_API_URL=${VITE_API_URL}
+    restart: unless-stopped
 
   ui-library:
-    build:
-      context: ../mf-logistics-ui-library
+    image: ${SCW_REGISTRY}/${SCW_NAMESPACE}/ui-library:${IMAGE_TAG:-latest}
     container_name: logistics_ui_library
+    restart: unless-stopped
 
   backend-api:
-    build:
-      context: ../backend-api
+    image: ${SCW_REGISTRY}/${SCW_NAMESPACE}/backend-api:${IMAGE_TAG:-latest}
     container_name: logistics_backend_api
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-15m}
+      - JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN:-7d}
       - PORT=3000
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
 
   postgres:
     image: postgres:16
     container_name: warehousedb
     environment:
-      POSTGRES_USER: warehouseuser
-      POSTGRES_PASSWORD: warehousepass
-      POSTGRES_DB: warehousedb
-    ports:
-      - '5433:5432'
+      POSTGRES_USER: ${POSTGRES_USER:-warehouseuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-warehousedb}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U warehouseuser -d warehousedb']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-warehouseuser} -d ${POSTGRES_DB:-warehousedb}']
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
 volumes:
   pgdata:

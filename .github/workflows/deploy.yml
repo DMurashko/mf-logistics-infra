@@ -1,0 +1,108 @@
+name: Deploy to Scaleway
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy (commit SHA or "latest")'
+        required: false
+        default: 'latest'
+
+env:
+  DEPLOY_PATH: /opt/logistics-app
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout infra repo
+        uses: actions/checkout@v4
+
+      - name: Fetch secrets from Scaleway Secret Manager
+        uses: scaleway/action-scw-secret@v0
+        with:
+          secret-names: |
+            SCW_REGISTRY,/logistics/SCW_REGISTRY
+            SCW_NAMESPACE,/logistics/SCW_NAMESPACE
+            PUBLIC_URL,/logistics/PUBLIC_URL
+            POSTGRES_USER,/logistics/POSTGRES_USER
+            POSTGRES_PASSWORD,/logistics/POSTGRES_PASSWORD
+            POSTGRES_DB,/logistics/POSTGRES_DB
+            JWT_SECRET,/logistics/JWT_SECRET
+            JWT_REFRESH_SECRET,/logistics/JWT_REFRESH_SECRET
+            JWT_EXPIRES_IN,/logistics/JWT_EXPIRES_IN
+            JWT_REFRESH_EXPIRES_IN,/logistics/JWT_REFRESH_EXPIRES_IN
+          access-key: ${{ secrets.SCW_ACCESS_KEY }}
+          secret-key: ${{ secrets.SCW_SECRET_KEY }}
+          default-project-id: ${{ secrets.SCW_DEFAULT_PROJECT_ID }}
+          default-organization-id: ${{ secrets.SCW_DEFAULT_ORGANIZATION_ID }}
+
+      - name: Copy docker-compose and nginx config to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SCW_HOST }}
+          username: ${{ secrets.SCW_USER }}
+          key: ${{ secrets.SCW_SSH_KEY }}
+          source: 'docker-compose.yml,nginx.conf'
+          target: ${{ env.DEPLOY_PATH }}
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          SCW_REGISTRY: ${{ env.SCW_REGISTRY }}
+          SCW_NAMESPACE: ${{ env.SCW_NAMESPACE }}
+          PUBLIC_URL: ${{ env.PUBLIC_URL }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          JWT_SECRET: ${{ env.JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ env.JWT_REFRESH_SECRET }}
+          JWT_EXPIRES_IN: ${{ env.JWT_EXPIRES_IN }}
+          JWT_REFRESH_EXPIRES_IN: ${{ env.JWT_REFRESH_EXPIRES_IN }}
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+          SCW_SECRET_KEY: ${{ secrets.SCW_SECRET_KEY }}
+        with:
+          host: ${{ secrets.SCW_HOST }}
+          username: ${{ secrets.SCW_USER }}
+          key: ${{ secrets.SCW_SSH_KEY }}
+          envs: SCW_REGISTRY,SCW_NAMESPACE,PUBLIC_URL,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,JWT_SECRET,JWT_REFRESH_SECRET,JWT_EXPIRES_IN,JWT_REFRESH_EXPIRES_IN,IMAGE_TAG,SCW_SECRET_KEY
+          script: |
+            set -e
+
+            cd ${{ env.DEPLOY_PATH }}
+
+            # ── Write .env from secrets ──
+            cat > .env <<EOF
+            SCW_REGISTRY=${SCW_REGISTRY}
+            SCW_NAMESPACE=${SCW_NAMESPACE}
+            IMAGE_TAG=${IMAGE_TAG}
+            PUBLIC_URL=${PUBLIC_URL}
+            VITE_UI_LIBRARY_URL=${PUBLIC_URL}/mf/ui-library/dist/remoteEntry.js
+            VITE_LOGIN_APP_URL=${PUBLIC_URL}/mf/login/remoteEntry.js
+            VITE_DASHBOARD_APP_URL=${PUBLIC_URL}/mf/dashboard/remoteEntry.js
+            VITE_API_URL=${PUBLIC_URL}/api
+            POSTGRES_USER=${POSTGRES_USER}
+            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+            POSTGRES_DB=${POSTGRES_DB}
+            DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+            JWT_SECRET=${JWT_SECRET}
+            JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+            JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
+            JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN}
+            EOF
+
+            chmod 600 .env
+
+            # ── Login to Scaleway Container Registry ──
+            echo "${SCW_SECRET_KEY}" | docker login ${SCW_REGISTRY} -u nologin --password-stdin
+
+            # ── Pull latest images ──
+            docker compose pull
+
+            # ── Deploy ──
+            docker compose up -d --remove-orphans
+
+            # ── Clean up old images ──
+            docker image prune -f
+
+            echo "Deployment complete (tag: ${IMAGE_TAG})"
