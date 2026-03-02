@@ -18,53 +18,13 @@ jobs:
       - name: Checkout infra repo
         uses: actions/checkout@v4
 
-      - name: Fetch secrets from Scaleway Secret Manager
-        uses: scaleway/action-scw-secret@v0
-        with:
-          secret-names: |
-            SCW_REGISTRY,/logistics/SCW_REGISTRY
-            SCW_NAMESPACE,/logistics/SCW_NAMESPACE
-            PUBLIC_URL,/logistics/PUBLIC_URL
-            POSTGRES_USER,/logistics/POSTGRES_USER
-            POSTGRES_PASSWORD,/logistics/POSTGRES_PASSWORD
-            POSTGRES_DB,/logistics/POSTGRES_DB
-            JWT_SECRET,/logistics/JWT_SECRET
-            JWT_REFRESH_SECRET,/logistics/JWT_REFRESH_SECRET
-            JWT_EXPIRES_IN,/logistics/JWT_EXPIRES_IN
-            JWT_REFRESH_EXPIRES_IN,/logistics/JWT_REFRESH_EXPIRES_IN
-          access-key: ${{ secrets.SCW_ACCESS_KEY }}
-          secret-key: ${{ secrets.SCW_SECRET_KEY }}
-          default-project-id: ${{ secrets.SCW_DEFAULT_PROJECT_ID }}
-          default-organization-id: ${{ secrets.SCW_DEFAULT_ORGANIZATION_ID }}
-
-      - name: Generate .env file
-        run: |
-          cat > .env <<EOF
-          SCW_REGISTRY=${{ env.SCW_REGISTRY }}
-          SCW_NAMESPACE=${{ env.SCW_NAMESPACE }}
-          IMAGE_TAG=${{ github.event.inputs.image_tag }}
-          PUBLIC_URL=${{ env.PUBLIC_URL }}
-          VITE_UI_LIBRARY_URL=${{ env.PUBLIC_URL }}/mf/ui-library/dist/remoteEntry.js
-          VITE_LOGIN_APP_URL=${{ env.PUBLIC_URL }}/mf/login/remoteEntry.js
-          VITE_DASHBOARD_APP_URL=${{ env.PUBLIC_URL }}/mf/dashboard/remoteEntry.js
-          VITE_API_URL=${{ env.PUBLIC_URL }}/api
-          POSTGRES_USER=${{ env.POSTGRES_USER }}
-          POSTGRES_PASSWORD=${{ env.POSTGRES_PASSWORD }}
-          POSTGRES_DB=${{ env.POSTGRES_DB }}
-          DATABASE_URL=postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@postgres:5432/${{ env.POSTGRES_DB }}?schema=public
-          JWT_SECRET=${{ env.JWT_SECRET }}
-          JWT_REFRESH_SECRET=${{ env.JWT_REFRESH_SECRET }}
-          JWT_EXPIRES_IN=${{ env.JWT_EXPIRES_IN }}
-          JWT_REFRESH_EXPIRES_IN=${{ env.JWT_REFRESH_EXPIRES_IN }}
-          EOF
-
-      - name: Copy files to server
+      - name: Copy docker-compose and nginx config to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SCW_HOST }}
           username: ${{ secrets.SCW_USER }}
           key: ${{ secrets.SCW_SSH_KEY }}
-          source: 'docker-compose.yml,nginx.conf,.env'
+          source: 'docker-compose.yml,nginx.conf'
           target: ${{ env.DEPLOY_PATH }}
 
       - name: Deploy via SSH
@@ -77,11 +37,13 @@ jobs:
             set -e
             cd /opt/logistics-app
 
-            chmod 600 .env
+            source .env
+
+            # ── Override IMAGE_TAG if provided ──
+            export IMAGE_TAG="${IMAGE_TAG}"
 
             # ── Login to Scaleway Container Registry ──
-            source .env
-            echo "${{ secrets.SCW_SECRET_KEY }}" | docker login ${SCW_REGISTRY} -u nologin --password-stdin
+            echo "${SCW_SECRET_KEY}" | docker login "${SCW_REGISTRY}" -u nologin --password-stdin
 
             # ── Pull latest images ──
             docker compose pull
