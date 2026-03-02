@@ -30,6 +30,7 @@ services:
     image: ${SCW_REGISTRY}/${SCW_NAMESPACE}/login-app:${IMAGE_TAG:-latest}
     container_name: logistics_login_app
     environment:
+      - VITE_UI_LIBRARY_URL=${VITE_UI_LIBRARY_URL}
       - VITE_LOGIN_APP_URL=${VITE_LOGIN_APP_URL}
       - VITE_API_URL=${VITE_API_URL}
     restart: unless-stopped
@@ -38,6 +39,8 @@ services:
     image: ${SCW_REGISTRY}/${SCW_NAMESPACE}/dashboard-app:${IMAGE_TAG:-latest}
     container_name: logistics_dashboard_app
     environment:
+      - VITE_UI_LIBRARY_URL=${VITE_UI_LIBRARY_URL}
+      - VITE_LOGIN_APP_URL=${VITE_LOGIN_APP_URL}
       - VITE_DASHBOARD_APP_URL=${VITE_DASHBOARD_APP_URL}
       - VITE_API_URL=${VITE_API_URL}
     restart: unless-stopped
